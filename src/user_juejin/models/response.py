@@ -166,22 +166,34 @@ class ListArticlesResponse(ApiResponse):
         for item in _data_list(data):
             if not isinstance(item, dict):
                 continue
+            # 真实结构是 data[].article_info.*；扁平结构则直接取自身
+            info = item.get("article_info")
+            if not isinstance(info, dict):
+                info = item
+            # tag_ids 在 article_info 里可能是 null，实际标签在 item.tags[]
+            tag_ids = info.get("tag_ids")
+            if not tag_ids and isinstance(item.get("tags"), list):
+                tag_ids = [
+                    str(t.get("tag_id", ""))
+                    for t in item["tags"]
+                    if isinstance(t, dict)
+                ]
             articles.append(ArticleItem(
-                article_id=str(item.get("article_id", "")),
-                title=item.get("title", ""),
-                content=item.get("mark_content", ""),
-                brief_content=item.get("brief_content", ""),
-                category_id=item.get("category_id", ""),
-                tag_ids=item.get("tag_ids", []),
-                view_count=item.get("view_count", 0),
-                digg_count=item.get("digg_count", 0),
-                comment_count=item.get("comment_count", 0),
-                collect_count=item.get("collect_count", 0),
-                ctime=item.get("ctime", ""),
-                rtime=item.get("rtime", ""),
-                status=item.get("status", 0),
-                audit_status=item.get("audit_status", 0),
-                cover_image=item.get("cover_image", ""),
+                article_id=str(info.get("article_id", item.get("article_id", ""))),
+                title=info.get("title", ""),
+                content=info.get("mark_content", ""),
+                brief_content=info.get("brief_content", ""),
+                category_id=info.get("category_id", ""),
+                tag_ids=tag_ids or [],
+                view_count=info.get("view_count", 0),
+                digg_count=info.get("digg_count", 0),
+                comment_count=info.get("comment_count", 0),
+                collect_count=info.get("collect_count", 0),
+                ctime=info.get("ctime", ""),
+                rtime=info.get("rtime", ""),
+                status=info.get("status", 0),
+                audit_status=info.get("audit_status", 0),
+                cover_image=info.get("cover_image", ""),
             ))
         return cls(
             err_no=data.get("err_no", 0),
