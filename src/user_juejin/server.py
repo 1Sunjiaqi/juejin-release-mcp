@@ -272,7 +272,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=_json_result(result))]
         
         elif name == "update_draft":
-            from ..models.request import PublishArticleRequest, UpdateDraftRequest
+            from .models.request import PublishArticleRequest, UpdateDraftRequest
 
             req = UpdateDraftRequest(
                 draft_id=arguments["draftId"],
@@ -321,7 +321,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=_json_result(result))]
         
         elif name == "list_drafts":
-            from ..models.request import ListDraftsRequest
+            from .models.request import ListDraftsRequest
             req = ListDraftsRequest(
                 page=arguments.get("page", 1),
                 page_size=arguments.get("pageSize", 10),
@@ -350,7 +350,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=_json_result(result))]
         
         elif name == "list_articles":
-            from ..models.request import ListArticlesRequest
+            from .models.request import ListArticlesRequest
             req = ListArticlesRequest(
                 page=arguments.get("page", 1),
                 page_size=arguments.get("pageSize", 10),
@@ -404,7 +404,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=_json_result(result))]
         
         elif name == "list_tags":
-            from ..models.request import ListTagsRequest
+            from .models.request import ListTagsRequest
             req = ListTagsRequest(
                 keyword=arguments.get("keyword"),
                 page=arguments.get("page", 1),
@@ -432,6 +432,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 "level": resp.level,
                 "article_count": resp.article_count,
                 "follower_count": resp.follower_count,
+                "can_tag_cnt": resp.can_tag_cnt,
             }
             return [TextContent(type="text", text=_json_result(result))]
         

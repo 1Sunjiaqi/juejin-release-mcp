@@ -17,19 +17,57 @@ class ApiResponse:
         return self.err_no == 0
 
 
+def _payload(raw: Any) -> Any:
+    """取出响应体的 data。出错时 data 可能是 None 或空字符串，不是 dict。"""
+    if not isinstance(raw, dict):
+        return None
+    return raw.get("data")
+
+
+def _data_dict(raw: Any) -> dict:
+    d = _payload(raw)
+    return d if isinstance(d, dict) else {}
+
+
+def _data_list(raw: Any) -> list:
+    """列表接口的 data 通常是 list，也可能被包在 data/list 字段里。"""
+    d = _payload(raw)
+    if isinstance(d, list):
+        return d
+    if isinstance(d, dict):
+        for key in ("data", "list", "items"):
+            v = d.get(key)
+            if isinstance(v, list):
+                return v
+    return []
+
+
+def _total(raw: Any) -> int:
+    """分页总数：有的接口放在顶层，有的放在 data 里。"""
+    if not isinstance(raw, dict):
+        return 0
+    if isinstance(raw.get("count"), int):
+        return raw["count"]
+    d = _payload(raw)
+    if isinstance(d, dict) and isinstance(d.get("count"), int):
+        return d["count"]
+    return 0
+
+
 @dataclass
 class CreateDraftResponse(ApiResponse):
     """创建草稿响应"""
     draft_id: str = ""
     article_id: str = ""
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "CreateDraftResponse":
+        payload = _data_dict(data)
         return cls(
             err_no=data.get("err_no", 0),
             err_msg=data.get("err_msg", ""),
-            draft_id=data.get("data", {}).get("id", ""),
-            article_id=data.get("data", {}).get("article_id", ""),
+            draft_id=payload.get("id", ""),
+            article_id=payload.get("article_id", ""),
         )
 
 
@@ -41,7 +79,7 @@ class PublishArticleResponse(ApiResponse):
     
     @classmethod
     def from_dict(cls, data: dict, article_link_template: str = "https://juejin.cn/post/%s") -> "PublishArticleResponse":
-        article_id = data.get("data", {}).get("article_id", "")
+        article_id = _data_dict(data).get("article_id", "")
         return cls(
             err_no=data.get("err_no", 0),
             err_msg=data.get("err_msg", ""),
@@ -73,7 +111,9 @@ class ListDraftsResponse(ApiResponse):
     @classmethod
     def from_dict(cls, data: dict) -> "ListDraftsResponse":
         drafts = []
-        for item in data.get("data", {}).get("data", []):
+        for item in _data_list(data):
+            if not isinstance(item, dict):
+                continue
             drafts.append(DraftItem(
                 id=item.get("id", ""),
                 title=item.get("title", ""),
@@ -89,7 +129,7 @@ class ListDraftsResponse(ApiResponse):
             err_no=data.get("err_no", 0),
             err_msg=data.get("err_msg", ""),
             drafts=drafts,
-            total=data.get("data", {}).get("count", 0),
+            total=_total(data),
         )
 
 
@@ -123,8 +163,9 @@ class ListArticlesResponse(ApiResponse):
     @classmethod
     def from_dict(cls, data: dict) -> "ListArticlesResponse":
         articles = []
-        article_data = data.get("data", {})
-        for item in article_data.get("data", []):
+        for item in _data_list(data):
+            if not isinstance(item, dict):
+                continue
             articles.append(ArticleItem(
                 article_id=str(item.get("article_id", "")),
                 title=item.get("title", ""),
@@ -146,8 +187,8 @@ class ListArticlesResponse(ApiResponse):
             err_no=data.get("err_no", 0),
             err_msg=data.get("err_msg", ""),
             articles=articles,
-            total=article_data.get("count", 0),
-            has_more=article_data.get("has_more", False),
+            total=_total(data),
+            has_more=bool(_data_dict(data).get("has_more", False)),
         )
 
 
@@ -167,11 +208,17 @@ class ListCategoriesResponse(ApiResponse):
     @classmethod
     def from_dict(cls, data: dict) -> "ListCategoriesResponse":
         categories = []
-        for item in data.get("data", {}).get("categories", []):
+        for item in _data_list(data):
+            if not isinstance(item, dict):
+                continue
+            # 真实结构是 data[].category.category_name，扁平结构则直接就是自身
+            cat = item.get("category")
+            if not isinstance(cat, dict):
+                cat = item
             categories.append(CategoryItem(
-                category_id=item.get("category_id", ""),
-                category_name=item.get("category_name", ""),
-                category_url=item.get("category_url", ""),
+                category_id=cat.get("category_id", ""),
+                category_name=cat.get("category_name", ""),
+                category_url=cat.get("category_url", ""),
             ))
         return cls(
             err_no=data.get("err_no", 0),
@@ -197,12 +244,18 @@ class ListTagsResponse(ApiResponse):
     @classmethod
     def from_dict(cls, data: dict) -> "ListTagsResponse":
         tags = []
-        for item in data.get("data", {}).get("tags", []):
+        for item in _data_list(data):
+            if not isinstance(item, dict):
+                continue
+            # 真实结构是 data[].tag.tag_name，扁平结构则直接就是自身
+            tag = item.get("tag")
+            if not isinstance(tag, dict):
+                tag = item
             tags.append(TagItem(
-                tag_id=item.get("tag_id", ""),
-                tag_name=item.get("tag_name", ""),
-                tag_url=item.get("tag_url", ""),
-                article_count=item.get("article_count", 0),
+                tag_id=tag.get("tag_id", ""),
+                tag_name=tag.get("tag_name", ""),
+                tag_url=tag.get("tag_url", ""),
+                article_count=tag.get("post_article_count", tag.get("article_count", 0)),
             ))
         return cls(
             err_no=data.get("err_no", 0),
@@ -223,20 +276,23 @@ class UserInfo(ApiResponse):
     article_count: int = 0
     digg_count: int = 0
     follower_count: int = 0
-    
+    can_tag_cnt: int = 0
+
     @classmethod
     def from_dict(cls, data: dict) -> "UserInfo":
-        user_data = data.get("data", {})
+        u = _data_dict(data)
         return cls(
             err_no=data.get("err_no", 0),
             err_msg=data.get("err_msg", ""),
-            user_id=str(user_data.get("user_id", "")),
-            user_name=user_data.get("user_name", ""),
-            avatar_url=user_data.get("avatar_url", ""),
-            company=user_data.get("company", ""),
-            job_title=user_data.get("job_title", ""),
-            level=user_data.get("level", 0),
-            article_count=user_data.get("article_count", 0),
-            digg_count=user_data.get("digg_count", 0),
-            follower_count=user_data.get("follower_count", 0),
+            user_id=str(u.get("user_id", "")),
+            user_name=u.get("user_name", ""),
+            avatar_url=u.get("avatar_large", u.get("avatar_url", "")),
+            company=u.get("company", ""),
+            job_title=u.get("job_title", ""),
+            level=u.get("level", 0),
+            article_count=u.get("post_article_count", u.get("article_count", 0)),
+            digg_count=u.get("got_digg_count", u.get("digg_count", 0)),
+            follower_count=u.get("follower_count", 0),
+            # 该账号每篇文章允许的最大标签数，本账号为 1
+            can_tag_cnt=u.get("can_tag_cnt", 0),
         )

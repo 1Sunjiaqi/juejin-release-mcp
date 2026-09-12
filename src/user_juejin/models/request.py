@@ -114,11 +114,13 @@ class ListDraftsRequest:
     """获取草稿列表请求"""
     page: int = 1
     page_size: int = 10
-    
+    keyword: Optional[str] = None
+
     def to_api_dict(self) -> dict:
         return {
             "page_no": self.page,
             "page_size": self.page_size,
+            "keyword": self.keyword or "",
         }
 
 
@@ -141,16 +143,19 @@ class ListArticlesRequest:
 
 @dataclass
 class ListTagsRequest:
-    """获取标签列表请求"""
+    """获取标签列表请求
+
+    接口参数是 cursor/limit/sort_type，其中 cursor 是偏移量而非页码。
+    """
     keyword: Optional[str] = None
     page: int = 1
     page_size: int = 20
-    
+    sort_type: int = 1
+
     def to_api_dict(self) -> dict:
-        result = {
-            "page_no": self.page,
-            "page_size": self.page_size,
+        return {
+            "cursor": str((max(self.page, 1) - 1) * self.page_size),
+            "limit": self.page_size,
+            "key_word": self.keyword or "",
+            "sort_type": self.sort_type,
         }
-        if self.keyword:
-            result["key_word"] = self.keyword
-        return result

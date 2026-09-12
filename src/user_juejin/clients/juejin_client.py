@@ -46,19 +46,20 @@ class JuejinClient:
     CREATE_DRAFT_URL = "https://api.juejin.cn/content_api/v1/article_draft/create"
     UPDATE_DRAFT_URL = "https://api.juejin.cn/content_api/v1/article_draft/update"
     DELETE_DRAFT_URL = "https://api.juejin.cn/content_api/v1/article_draft/delete"
-    LIST_DRAFTS_URL = "https://api.juejin.cn/content_api/v1/article_draft/list"
-    
+    LIST_DRAFTS_URL = "https://api.juejin.cn/content_api/v1/article_draft/list_by_user"
+
     PUBLISH_ARTICLE_URL = "https://api.juejin.cn/content_api/v1/article/publish"
     UPDATE_ARTICLE_URL = "https://api.juejin.cn/content_api/v1/article/update"
     DELETE_ARTICLE_URL = "https://api.juejin.cn/content_api/v1/article/delete"
     GET_ARTICLE_URL = "https://api.juejin.cn/content_api/v1/article/detail"
     LIST_ARTICLES_URL = "https://api.juejin.cn/content_api/v1/article/list_by_user"
-    
+
     LIST_CATEGORIES_URL = "https://api.juejin.cn/tag_api/v1/query_category_list"
     LIST_TAGS_URL = "https://api.juejin.cn/tag_api/v1/query_tag_list"
-    SEARCH_TAGS_URL = "https://api.juejin.cn/recommend_api/v1/tag/recommend/search"
-    
-    USER_INFO_URL = "https://api.juejin.cn/user_api/v1/user/info"
+
+    # 用户信息必须用 GET：同路径的 POST 返回“请求路由不存在”。
+    # 不传 user_id 时返回当前登录用户。
+    USER_INFO_URL = "https://api.juejin.cn/user_api/v1/user/get"
     
     ARTICLE_LINK_TEMPLATE = "https://juejin.cn/post/%s"
     
@@ -96,12 +97,12 @@ class JuejinClient:
             h["x-secsdk-csrf-token"] = self.config.csrf_token
         return h
     
-    def _request(self, url: str, data: dict) -> dict:
-        """发送 HTTP 请求"""
+    def _request(self, url: str, data: dict, method: str = "POST") -> dict:
+        """发送 HTTP 请求（method="GET" 时不带请求体）"""
         headers = self._get_headers()
-        body = json.dumps(data).encode("utf-8")
-        
-        request = Request(url, data=body, headers=headers, method="POST")
+        body = json.dumps(data).encode("utf-8") if method == "POST" else None
+
+        request = Request(url, data=body, headers=headers, method=method)
         
         try:
             if _CERTIFI_CAFILE:
@@ -143,8 +144,8 @@ class JuejinClient:
         return CreateDraftResponse.from_dict(result)
     
     def delete_draft(self, draft_id: str) -> dict:
-        """删除草稿"""
-        data = {"id": draft_id}
+        """删除草稿（参数名是 draft_id；用 id 会返回“参数错误”）"""
+        data = {"draft_id": draft_id}
         return self._request(self.DELETE_DRAFT_URL, data)
     
     def list_drafts(self, req: Optional[ListDraftsRequest] = None) -> ListDraftsResponse:
@@ -196,16 +197,15 @@ class JuejinClient:
         return ListCategoriesResponse.from_dict(result)
     
     def list_tags(self, req: Optional[ListTagsRequest] = None) -> ListTagsResponse:
-        """获取标签列表"""
+        """获取标签列表（搜索和分页是同一个接口，靠 key_word 区分）"""
         req = req or ListTagsRequest()
         data = req.to_api_dict()
-        url = self.SEARCH_TAGS_URL if req.keyword else self.LIST_TAGS_URL
-        result = self._request(url, data)
+        result = self._request(self.LIST_TAGS_URL, data)
         return ListTagsResponse.from_dict(result)
     
     # ==================== 用户信息 ====================
     
     def get_user_info(self) -> UserInfo:
-        """获取用户信息"""
-        result = self._request(self.USER_INFO_URL, {})
+        """获取当前登录用户信息（必须 GET，不传 user_id 即当前用户）"""
+        result = self._request(self.USER_INFO_URL, {}, method="GET")
         return UserInfo.from_dict(result)
