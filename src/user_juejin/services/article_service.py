@@ -66,12 +66,19 @@ class ArticleService:
         publish_resp = self.client.publish_article(publish_req)
         
         if not publish_resp.success:
-            return {
+            result = {
                 "success": False,
                 "error": publish_resp.err_msg,
                 "code": publish_resp.err_no,
                 "draft_id": draft_resp.draft_id,
+                "brief_length": len(description),
             }
+            if publish_resp.err_no == 2 and len(description) > 100:
+                result["hint"] = (
+                    f"摘要 {len(description)} 字，超过服务端上限（实测 112 字仍可发布、172 字必失败）。"
+                    "publish 的「参数错误」多半就是这个；把摘要压到 ≤100 字后重发。"
+                )
+            return result
         
         return {
             "success": True,

@@ -37,27 +37,34 @@ export JUEJIN_COOKIE="sessionid=你的sessionid"
 | 删除草稿 | `content_api/v1/article_draft/delete` | sessionid | 参数用 `draft_id` 不是 `id` |
 | 删除文章 | `content_api/v1/article/delete` | sessionid | 参数用 `article_id` |
 
-### 3. 发布文章特殊要求
+### 3. 发布文章的真实要求（2026-09-13 用浏览器逐字核对）
 
-发布文章除了 sessionid，**还必需两个字数参数**：
+**必需：摘要（`brief_content`）≤ 100 字。**
 
-```json
-{
-  "draft_id": "草稿ID",
-  "sync_to_org": false,
-  "column_ids": [],
-  "theme_ids": [],
-  "encrypted_word_count": 1077871,  // 必需！从浏览器开发者工具复制
-  "origin_word_count": 15            // 必需！正文实际字数
-}
+超过时 `article/publish` 返回 `err_no=2「参数错误」`，而 `article_draft/create` /
+`article_draft/update` **不校验**（照样返回 success），所以坑一直藏到发布那一步才炸。
+实测：摘要 97 字、112 字发布成功；172 字必然失败（硬上限落在 113~172 字之间）。
+创作者中心的摘要输入框标的就是「/100」——写草稿时就把摘要压到 100 字以内。
+
+**旧文档在这一节写错了**，订正如下：
+
+| 参数 | 旧文档说法 | 实测结论 |
+|---|---|---|
+| `encrypted_word_count` | 必需，要从 DevTools 复制 | **非必需**，完全不传也能发布成功 |
+| `origin_word_count` | 必需，「正文实际字数」 | 非必需。它是创作者中心底部的「**正文字数**」（实测 2386），不是 `len(正文)` 字符数（5496） |
+
+创作者中心点「发布」时实际发出的请求（DevTools 抓包，一字未改）：
+
+```
+POST https://api.juejin.cn/content_api/v1/article/publish?aid=2608&uuid=<客户端生成>
+x-secsdk-csrf-token: 000100000001c3c8...   # 浏览器会带；脚本不带也能成功
+Cookie: sessionid=...
+{"draft_id":"7684534717442310154","sync_to_org":false,"column_ids":[],"theme_ids":[],
+ "encrypted_word_count":1075626,"origin_word_count":2386}
 ```
 
-**如何获取字数参数：**
-1. 在掘金创作者中心编辑文章
-2. 打开浏览器开发者工具 (F12)
-3. 点击"发布"按钮
-4. 查看 Network 中的 `article/publish` 请求
-5. 复制请求体中的 `encrypted_word_count` 和 `origin_word_count`
+排查提示：发布报 `参数错误` 时**先量摘要长度**，再去看浏览器真实请求；
+不要从 cookie / uuid / csrf 入手——这三项实测都不是发布成功的必要条件。
 
 ### 4. 各接口请求参数说明
 
@@ -125,7 +132,7 @@ export JUEJIN_COOKIE="sessionid=你的sessionid"
 | 错误 | 原因 | 解决 |
 |------|------|------|
 | "请求路由不存在" | 使用了错误的 URL | 草稿列表用 `list_by_user` 不是 `list` |
-| "参数错误" | 发布时缺少字数参数 | 添加 `encrypted_word_count` 和 `origin_word_count` |
+| "参数错误" | 多半是**摘要（`brief_content`）超过 100 字**（create/update 不校验，只有 publish 拦）；也可能是端点或参数名写错 | 把摘要压到 ≤100 字；再核对端点、参数名。别急着怀疑 cookie/uuid/csrf |
 | 返回空数据 | Cookie 无效或过期 | 重新从浏览器获取 sessionid |
 
 ### 6. 参考 cURL 命令

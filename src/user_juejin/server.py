@@ -70,13 +70,17 @@ async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="publish_article",
-            description="发布文章到掘金平台。自动完成创建草稿和发布两步操作。需要配置 JUEJIN_COOKIE 环境变量。",
+            description=(
+                "发布文章到掘金平台。自动完成创建草稿和发布两步操作。需要配置 JUEJIN_COOKIE 环境变量。"
+                "注意：摘要（description）必须 ≤100 字，否则 article/publish 返回 err_no=2「参数错误」"
+                "（而 create/update 不校验，只有发布这步会拦）；发布失败时草稿仍会留在草稿箱，请用 list_drafts 清理。"
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "文章标题，必填"},
                     "content": {"type": "string", "description": "文章正文，Markdown 格式，必填"},
-                    "description": {"type": "string", "description": "文章摘要，可选。为空时自动从正文提取"},
+                    "description": {"type": "string", "description": "文章摘要，可选。为空时自动从正文提取。必须 ≤100 字，否则发布被拒"},
                     "categoryId": {"type": "string", "description": "分类 ID，可选"},
                     "tagIds": {"type": "array", "items": {"type": "string"}, "description": "标签 ID 列表，可选"},
                 },
@@ -91,7 +95,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "title": {"type": "string", "description": "文章标题，必填"},
                     "content": {"type": "string", "description": "文章正文，Markdown 格式，必填"},
-                    "description": {"type": "string", "description": "文章摘要，可选"},
+                    "description": {"type": "string", "description": "文章摘要，可选。必须 ≤100 字，否则发布被拒（create/update 不校验，只有 publish 拦）"},
                     "categoryId": {"type": "string", "description": "分类 ID，可选"},
                     "tagIds": {"type": "array", "items": {"type": "string"}, "description": "标签 ID 列表，可选"},
                     "coverImage": {"type": "string", "description": "封面图片 URL，可选"},
@@ -112,7 +116,7 @@ async def list_tools() -> list[Tool]:
                     "draftId": {"type": "string", "description": "草稿 ID（请求体字段 id），必填"},
                     "title": {"type": "string", "description": "文章标题，可选"},
                     "content": {"type": "string", "description": "文章正文 Markdown（mark_content），可选"},
-                    "description": {"type": "string", "description": "摘要（brief_content），可选"},
+                    "description": {"type": "string", "description": "摘要（brief_content），可选。必须 ≤100 字，否则后续发布被拒"},
                     "categoryId": {"type": "string", "description": "分类 ID（category_id），可选"},
                     "tagIds": {"type": "array", "items": {"type": "string"}, "description": "标签 ID 列表（tag_ids），可选"},
                     "linkUrl": {"type": "string", "description": "link_url，可选，默认不传则不写入"},
@@ -200,7 +204,7 @@ async def list_tools() -> list[Tool]:
                     "articleId": {"type": "string", "description": "文章 ID，必填"},
                     "title": {"type": "string", "description": "文章标题，可选"},
                     "content": {"type": "string", "description": "文章正文，可选"},
-                    "description": {"type": "string", "description": "文章摘要，可选"},
+                    "description": {"type": "string", "description": "文章摘要，可选。必须 ≤100 字，否则发布被拒（create/update 不校验，只有 publish 拦）"},
                     "categoryId": {"type": "string", "description": "分类 ID，可选"},
                     "tagIds": {"type": "array", "items": {"type": "string"}, "description": "标签 ID 列表，可选"},
                 },
